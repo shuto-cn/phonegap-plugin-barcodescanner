@@ -101,6 +101,8 @@
 @property (nonatomic, retain) IBOutlet UIView* overlayView;
 @property (nonatomic, retain) UIToolbar * toolbar;
 @property (nonatomic, retain) UIView * reticleView;
+@property (nonatomic, retain) UIImageView * torchButton;
+@property (nonatomic, retain) UILabel *openLight;
 // unsafe_unretained is equivalent to assign - used to prevent retain cycles in the property below
 @property (nonatomic, unsafe_unretained) id orientationDelegate;
 
@@ -455,7 +457,7 @@ parentViewController:(UIViewController*)parentViewController
     }];
 }
 
-- (void)toggleTorch {
+- (void)toggleTorch{
   AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
   [device lockForConfiguration:nil];
   if (device.flashActive) {
@@ -806,7 +808,24 @@ parentViewController:(UIViewController*)parentViewController
 
 - (IBAction)torchButtonPressed:(id)sender
 {
-  [self.processor performSelector:@selector(toggleTorch) withObject:nil afterDelay:0];
+    NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+    NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+    if([self.openLight.text isEqualToString:@"打开手机电筒"]){
+        NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"关闭手机电筒" attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+        self.openLight.attributedText = string;
+        NSString *imagePath = [bundle pathForResource:@"torch_on" ofType:@"png"];
+        UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+        self.torchButton.image = image;
+        
+    }else{
+        NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"打开手机电筒" attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+        self.openLight.attributedText = string;
+        NSString *imagePath = [bundle pathForResource:@"torch" ofType:@"png"];
+        UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+        self.torchButton.image = image;
+        
+    }
+    [self.processor performSelector:@selector(toggleTorch) withObject:nil afterDelay:0];
 }
 
 //--------------------------------------------------------------------------
@@ -833,6 +852,12 @@ parentViewController:(UIViewController*)parentViewController
 }
 
 //--------------------------------------------------------------------------
+#define RETICLE_SIZE    500.0f
+#define RETICLE_WIDTH    1.0f
+#define RETICLE_OFFSET   60.0f
+#define RETICLE_ALPHA     0.4f
+
+//--------------------------------------------------------------------------
 - (UIView*)buildOverlayView {
 
     if ( nil != self.alternateXib )
@@ -848,15 +873,26 @@ parentViewController:(UIViewController*)parentViewController
     overlayView.opaque              = NO;
 
     self.toolbar = [[UIToolbar alloc] init];
+    self.toolbar.tintColor = [UIColor colorWithRed:74/255.0 green:74/255.0 blue:74/255.0 alpha:1.0];
     self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 
+    NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+    NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+    NSString *imagePath = [bundle pathForResource:@"back" ofType:@"png"];
+    UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+
     id cancelButton = [[UIBarButtonItem alloc]
-                       initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
-                       target:(id)self
-                       action:@selector(cancelButtonPressed:)
-                       ];
-
-
+                      initWithImage:image
+                      style:UIBarButtonItemStylePlain
+                      target:(id)self
+                      action:@selector(cancelButtonPressed:)
+                      ];
+    id titleLable = [[UIBarButtonItem alloc]
+                     initWithTitle:@"扫一扫"
+                     style:UIBarButtonItemStylePlain
+                     target:nil
+                     action:nil
+                     ];
     id flexSpace = [[UIBarButtonItem alloc]
                     initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace
                     target:nil
@@ -868,7 +904,7 @@ parentViewController:(UIViewController*)parentViewController
                        target:(id)self
                        action:@selector(flipCameraButtonPressed:)
                        ];
-
+    
     NSMutableArray *items;
 
 #if USE_SHUTTER
@@ -887,32 +923,14 @@ parentViewController:(UIViewController*)parentViewController
     if (_processor.isShowFlipCameraButton) {
       items = [@[flexSpace, cancelButton, flexSpace, flipCamera] mutableCopy];
     } else {
-      items = [@[flexSpace, cancelButton, flexSpace] mutableCopy];
+        items = [@[cancelButton,flexSpace, titleLable, flexSpace] mutableCopy];
     }
 #endif
-
-    if (_processor.isShowTorchButton && !_processor.isFrontCamera) {
-      AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-      if ([device hasTorch] && [device hasFlash]) {
-        NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
-        NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
-        NSString *imagePath = [bundle pathForResource:@"torch" ofType:@"png"];
-        UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
-
-        id torchButton = [[UIBarButtonItem alloc]
-                           initWithImage:image
-                                   style:UIBarButtonItemStylePlain
-                                  target:(id)self
-                                  action:@selector(torchButtonPressed:)
-                           ];
-
-      [items insertObject:torchButton atIndex:0];
-    }
-  }
     self.toolbar.items = items;
     [overlayView addSubview: self.toolbar];
-
-    UIImage* reticleImage = [self buildReticleImage];
+    
+    float scanSize = bounds.size.width*0.7;
+    UIImage* reticleImage = [self buildReticleImag:scanSize];
     self.reticleView = [[UIImageView alloc] initWithImage:reticleImage];
 
     self.reticleView.opaque           = NO;
@@ -923,55 +941,196 @@ parentViewController:(UIViewController*)parentViewController
         | UIViewAutoresizingFlexibleTopMargin
         | UIViewAutoresizingFlexibleBottomMargin)
     ;
-
     [overlayView addSubview: self.reticleView];
+    //设置统一的视图颜色和视图的透明度
+    //设置背景蒙版
+    UIColor *color = [UIColor blackColor];
+    float alpha = 0.7;
+    //顶部
+    UIView *topView = [[UIView alloc]init];
+    topView.frame = CGRectMake(0, 64,
+                               bounds.size.width, (bounds.size.height-scanSize-64)/2-66);
+    topView.backgroundColor = color;
+    topView.alpha = alpha;
+    [overlayView addSubview:topView];
+    //左侧
+    UIView *leftView = [[UIView alloc]init];
+    leftView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2-34,
+                               (bounds.size.width-scanSize)/2,scanSize);
+    leftView.backgroundColor = color;
+    leftView.alpha = alpha;
+    [overlayView addSubview:leftView];
+    //右侧
+    UIView *rightView = [[UIView alloc]init];
+    rightView.frame = CGRectMake((bounds.size.width-scanSize)/2 + scanSize,
+                                (bounds.size.height-scanSize)/2-34,
+                                (bounds.size.width-scanSize)/2,scanSize);
+    rightView.backgroundColor = color;
+    rightView.alpha = alpha;
+    [overlayView addSubview:rightView];
+    //底部
+    UIView *bottomView = [[UIView alloc]init];
+    bottomView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2 + scanSize - 34,
+                               bounds.size.width,bounds.size.height);
+    bottomView.backgroundColor = color;
+    bottomView.alpha = alpha;
+    [overlayView addSubview:bottomView];
+    //绘制扫描线
+    CAGradientLayer *gl = [CAGradientLayer layer];
+    gl.frame = CGRectMake((bounds.size.width-scanSize)/2,(bounds.size.height-scanSize-34)/2,scanSize,RETICLE_WIDTH *2);
+    gl.startPoint = CGPointMake(1, 1);
+    gl.endPoint = CGPointMake(0.02, 1);
+    gl.colors = @[(__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:0.0].CGColor, (__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:1.0].CGColor, (__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:0.0].CGColor];
+    gl.locations = @[@(0), @(0.5f), @(1.0f)];
+    self.reticleView.layer.cornerRadius = 5;
+    [self.reticleView.layer addSublayer:gl];
+    //添加扫描提示
+    UILabel *scanText = [[UILabel alloc] init];
+    float slw = 143;
+    float slh = 18.5;
+    scanText.frame = CGRectMake((bounds.size.width-slw)/2,
+                                (bounds.size.height-scanSize)/2 + scanSize-20,
+                                slw,slh);
+    scanText.numberOfLines = 0;
+    [overlayView addSubview:scanText];
+    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码"attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+    scanText.attributedText = string;
+    scanText.textAlignment = NSTextAlignmentCenter;
+    scanText .alpha = 1.0;
+    //绘制手电筒按钮
+    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    if ([device hasTorch] && [device hasFlash]) {
+        NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+        NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+        NSString *imagePath = [bundle pathForResource:@"torch" ofType:@"png"];
+        UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+        self.torchButton = [[UIImageView alloc]
+                                    initWithImage:image
+                                    ];
+        UIView*tButton = [[UIControl alloc]
+                          initWithFrame:CGRectMake((bounds.size.width-self.torchButton.bounds.size.width)/2,
+                                                    bounds.size.height-self.torchButton.bounds.size.height*2.5,
+                                                    self.torchButton.bounds.size.width,
+                                                    self.torchButton.bounds.size.height)] ;
+        tButton.backgroundColor = [UIColor clearColor];
+        [(UIControl *)tButton addTarget:self action:@selector(torchButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
+        [tButton addSubview:self.torchButton];
+        [overlayView addSubview:tButton];
+        self.openLight = [[UILabel alloc] init];
+        float olw = 78;
+        float olh = 18.5;
+        self.openLight.frame = CGRectMake((bounds.size.width-olw)/2,
+                                     bounds.size.height-self.torchButton.bounds.size.height*1.3,
+                                     olw,olh);
+        self.openLight.numberOfLines = 0;
+        [overlayView addSubview:self.openLight];
+        NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"打开手机电筒" attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+        
+        self.openLight.attributedText = string;
+        self.openLight.textAlignment = NSTextAlignmentCenter;
+        self.openLight.alpha = 0.6;
+    }
     [self resizeElements];
     return overlayView;
 }
-
-//--------------------------------------------------------------------------
-
-#define RETICLE_SIZE    500.0f
-#define RETICLE_WIDTH    10.0f
-#define RETICLE_OFFSET   60.0f
-#define RETICLE_ALPHA     0.4f
-
 //-------------------------------------------------------------------------
 // builds the green box and red line
 //-------------------------------------------------------------------------
-- (UIImage*)buildReticleImage {
+- (UIImage*)buildReticleImag:(float)size {
+    //todo ggghhg
+    //self.navigationController.toolbarHidden = YES;
     UIImage* result;
-    UIGraphicsBeginImageContext(CGSizeMake(RETICLE_SIZE, RETICLE_SIZE));
+    UIGraphicsBeginImageContext(CGSizeMake(size, size));
     CGContextRef context = UIGraphicsGetCurrentContext();
 
-    if (self.processor.is1D) {
-        UIColor* color = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:RETICLE_ALPHA];
-        CGContextSetStrokeColorWithColor(context, color.CGColor);
-        CGContextSetLineWidth(context, RETICLE_WIDTH);
-        CGContextBeginPath(context);
-        CGFloat lineOffset = (CGFloat) (RETICLE_OFFSET+(0.5*RETICLE_WIDTH));
-        CGContextMoveToPoint(context, lineOffset, RETICLE_SIZE/2);
-        CGContextAddLineToPoint(context, RETICLE_SIZE-lineOffset, (CGFloat) (0.5*RETICLE_SIZE));
-        CGContextStrokePath(context);
-    }
-
     if (self.processor.is2D) {
-        UIColor* color = [UIColor colorWithRed:0.0 green:1.0 blue:0.0 alpha:RETICLE_ALPHA];
+        //绘制边框
+        UIColor* color = [UIColor colorWithRed:1.0 green:1.0 blue:1.0 alpha:1];
         CGContextSetStrokeColorWithColor(context, color.CGColor);
         CGContextSetLineWidth(context, RETICLE_WIDTH);
-        CGContextStrokeRect(context,
-                            CGRectMake(
-                                       RETICLE_OFFSET,
-                                       RETICLE_OFFSET,
-                                       RETICLE_SIZE-2*RETICLE_OFFSET,
-                                       RETICLE_SIZE-2*RETICLE_OFFSET
-                                       )
-                            );
+        CGContextStrokeRect(context,CGRectMake(size*0.15,size*0.15-1,size*0.7,size*0.7));
+        //绘制四个角
+        UIColor* greenColor = [UIColor colorWithRed:80/255 green:255/255 blue:162/255 alpha:1];
+        float lineWidth = RETICLE_WIDTH *1.5;
+        //绘制白色底色
+        //左上↖️
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1+lineWidth/2
+                  endX:size*0.15+20 endY:size*0.15-1+lineWidth/2
+                 color:color.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1
+                  endX:size*0.15+lineWidth/2 endY:size*0.15+19
+                 color:color.CGColor width:lineWidth];//|
+        //右上↗️
+        [self drawLine:context startX:size-size*0.15 startY:size*0.15-1+lineWidth/2
+                  endX:size-size*0.15-20 endY:size*0.15-1+lineWidth/2
+                 color:color.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15-1+lineWidth/2
+                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+19
+                 color:color.CGColor width:lineWidth];//|
+        //左下↙️
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-1-lineWidth/2
+                  endX:size*0.15+20 endY:size-size*0.15-1-lineWidth/2
+                 color:color.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2
+                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-21
+                 color:color.CGColor width:lineWidth];//|
+        //右下↘️
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-1-lineWidth/2
+                  endX:size-size*0.15-20 endY:size-size*0.15-1-lineWidth/2
+                 color:color.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2
+                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-21
+                 color:color.CGColor width:lineWidth];//|
+        //绘制绿色边角
+        //左上↖️
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1+lineWidth/2
+                  endX:size*0.15+20 endY:size*0.15-1+lineWidth/2
+                 color:greenColor.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1
+                  endX:size*0.15+lineWidth/2 endY:size*0.15+19
+                 color:greenColor.CGColor width:lineWidth];//|
+        //右上↗️
+        [self drawLine:context startX:size-size*0.15 startY:size*0.15-1+lineWidth/2
+                  endX:size-size*0.15-20 endY:size*0.15-1+lineWidth/2
+                 color:greenColor.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15-1+lineWidth/2
+                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+19
+                 color:greenColor.CGColor width:lineWidth];//|
+        //左下↙️
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-1-lineWidth/2
+                  endX:size*0.15+20 endY:size-size*0.15-1-lineWidth/2
+                 color:greenColor.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2
+                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-21
+                 color:greenColor.CGColor width:lineWidth];//|
+        //右下↘️
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-1-lineWidth/2
+                  endX:size-size*0.15-20 endY:size-size*0.15-1-lineWidth/2
+                 color:greenColor.CGColor width:lineWidth];//-
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2
+                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-21
+                 color:greenColor.CGColor width:lineWidth];//|
     }
 
     result = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     return result;
+}
+
+-(void)drawLine:(CGContextRef)context
+         startX:(float)startX
+         startY:(float)startY
+           endX:(float)endX
+           endY:(float)endY
+          color:(CGColorRef)color
+          width:(float)width
+{
+    CGContextSetStrokeColorWithColor(context, color);
+    CGContextSetLineWidth(context, width);
+    CGContextBeginPath(context);
+    CGContextMoveToPoint(context, startX, startY);
+    CGContextAddLineToPoint(context, endX, endY);
+    CGContextStrokePath(context);
 }
 
 #pragma mark CDVBarcodeScannerOrientationDelegate
@@ -1032,7 +1191,8 @@ parentViewController:(UIViewController*)parentViewController
     CGFloat toolbarHeight  = [self.toolbar frame].size.height;
     CGFloat rootViewHeight = CGRectGetHeight(bounds);
     CGFloat rootViewWidth  = CGRectGetWidth(bounds);
-    CGRect  rectArea       = CGRectMake(0, rootViewHeight - toolbarHeight, rootViewWidth, toolbarHeight);
+   // CGRect  rectArea       = CGRectMake(0, rootViewHeight - toolbarHeight, rootViewWidth, toolbarHeight);
+    CGRect  rectArea       = CGRectMake(0, 0, rootViewWidth, toolbarHeight+20);
     [self.toolbar setFrame:rectArea];
 
     CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
