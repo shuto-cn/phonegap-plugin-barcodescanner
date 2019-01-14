@@ -993,7 +993,7 @@ parentViewController:(UIViewController*)parentViewController
                                 slw,slh);
     scanText.numberOfLines = 0;
     [overlayView addSubview:scanText];
-    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码"attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码" attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
     scanText.attributedText = string;
     scanText.textAlignment = NSTextAlignmentCenter;
     scanText .alpha = 1.0;
