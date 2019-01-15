@@ -856,7 +856,17 @@ parentViewController:(UIViewController*)parentViewController
 #define RETICLE_WIDTH    1.0f
 #define RETICLE_OFFSET   60.0f
 #define RETICLE_ALPHA     0.4f
-
+//--------------------------------------------------------------------------
+//状态栏高度
+#define kStatusBarHeight [UIApplication sharedApplication].statusBarFrame.size.height
+//导航栏高度
+#define kNavigationHeight (kStatusBarHeight + 44)
+//tabbar高度
+#define kTabBarHeight (kStatusBarHeight == 44 ? 83 : 49)
+//顶部的安全距离
+#define kTopSafeAreaHeight (kStatusBarHeight - 20)
+//底部的安全距离
+#define kBottomSafeAreaHeight (kTabBarHeight - 49)
 //--------------------------------------------------------------------------
 - (UIView*)buildOverlayView {
 
@@ -866,13 +876,23 @@ parentViewController:(UIViewController*)parentViewController
     }
     CGRect bounds = self.view.frame;
     bounds = CGRectMake(0, 0, bounds.size.width, bounds.size.height);
-
     UIView* overlayView = [[UIView alloc] initWithFrame:bounds];
     overlayView.autoresizesSubviews = YES;
     overlayView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlayView.opaque              = NO;
 
+    UIView* statusBar =[[UIView alloc]init];
+    statusBar.frame = CGRectMake(0,0 ,bounds.size.width,kStatusBarHeight);
+    UIColor* whiteColor = [UIColor whiteColor];
+    statusBar.backgroundColor = whiteColor;
+    statusBar.alpha = 1.0f;
+    [overlayView addSubview:statusBar];
+    
     self.toolbar = [[UIToolbar alloc] init];
+    self.toolbar.backgroundColor = whiteColor;
+    self.toolbar.alpha=1.0;
+    self.toolbar.clipsToBounds=YES;
+    self.toolbar.opaque = NO;
     self.toolbar.tintColor = [UIColor colorWithRed:74/255.0 green:74/255.0 blue:74/255.0 alpha:1.0];
     self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 
@@ -948,14 +968,15 @@ parentViewController:(UIViewController*)parentViewController
     float alpha = 0.7;
     //顶部
     UIView *topView = [[UIView alloc]init];
-    topView.frame = CGRectMake(0, 64,
-                               bounds.size.width, (bounds.size.height-scanSize-64)/2-66);
+    float top = kNavigationHeight;
+    topView.frame = CGRectMake(0,top ,
+                               bounds.size.width, (bounds.size.height-scanSize-top)/2-top + kTopSafeAreaHeight);
     topView.backgroundColor = color;
     topView.alpha = alpha;
     [overlayView addSubview:topView];
     //左侧
     UIView *leftView = [[UIView alloc]init];
-    leftView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2-34,
+    leftView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2-top/2 + kTopSafeAreaHeight,
                                (bounds.size.width-scanSize)/2,scanSize);
     leftView.backgroundColor = color;
     leftView.alpha = alpha;
@@ -963,21 +984,23 @@ parentViewController:(UIViewController*)parentViewController
     //右侧
     UIView *rightView = [[UIView alloc]init];
     rightView.frame = CGRectMake((bounds.size.width-scanSize)/2 + scanSize,
-                                (bounds.size.height-scanSize)/2-34,
+                                (bounds.size.height-scanSize)/2-top/2 + kTopSafeAreaHeight,
                                 (bounds.size.width-scanSize)/2,scanSize);
     rightView.backgroundColor = color;
     rightView.alpha = alpha;
     [overlayView addSubview:rightView];
     //底部
     UIView *bottomView = [[UIView alloc]init];
-    bottomView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2 + scanSize - 34,
+    bottomView.frame = CGRectMake(0, (bounds.size.height-scanSize)/2 + scanSize - top/2 +  kTopSafeAreaHeight,
                                bounds.size.width,bounds.size.height);
     bottomView.backgroundColor = color;
     bottomView.alpha = alpha;
     [overlayView addSubview:bottomView];
     //绘制扫描线
     CAGradientLayer *gl = [CAGradientLayer layer];
-    gl.frame = CGRectMake((bounds.size.width-scanSize)/2,(bounds.size.height-scanSize-34)/2,scanSize,RETICLE_WIDTH *2);
+    gl.frame = CGRectMake((bounds.size.width-scanSize)/2,
+                          (bounds.size.height - kTopSafeAreaHeight - kBottomSafeAreaHeight - scanSize - top - kStatusBarHeight)/2 + kTopSafeAreaHeight/2 + (20-kTopSafeAreaHeight),
+                          scanSize,RETICLE_WIDTH *2);
     gl.startPoint = CGPointMake(1, 1);
     gl.endPoint = CGPointMake(0.02, 1);
     gl.colors = @[(__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:0.0].CGColor, (__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:1.0].CGColor, (__bridge id)[UIColor colorWithRed:80/255.0 green:255/255.0 blue:162/255.0 alpha:0.0].CGColor];
@@ -989,11 +1012,11 @@ parentViewController:(UIViewController*)parentViewController
     float slw = 143;
     float slh = 18.5;
     scanText.frame = CGRectMake((bounds.size.width-slw)/2,
-                                (bounds.size.height-scanSize)/2 + scanSize-20,
+                                (bounds.size.height-scanSize +kTopSafeAreaHeight)/2 + scanSize-20,
                                 slw,slh);
     scanText.numberOfLines = 0;
     [overlayView addSubview:scanText];
-    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码" attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码"attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
     scanText.attributedText = string;
     scanText.textAlignment = NSTextAlignmentCenter;
     scanText .alpha = 1.0;
@@ -1009,7 +1032,7 @@ parentViewController:(UIViewController*)parentViewController
                                     ];
         UIView*tButton = [[UIControl alloc]
                           initWithFrame:CGRectMake((bounds.size.width-self.torchButton.bounds.size.width)/2,
-                                                    bounds.size.height-self.torchButton.bounds.size.height*2.5,
+                                                    bounds.size.height-kBottomSafeAreaHeight-self.torchButton.bounds.size.height*2.5,
                                                     self.torchButton.bounds.size.width,
                                                     self.torchButton.bounds.size.height)] ;
         tButton.backgroundColor = [UIColor clearColor];
@@ -1020,7 +1043,7 @@ parentViewController:(UIViewController*)parentViewController
         float olw = 78;
         float olh = 18.5;
         self.openLight.frame = CGRectMake((bounds.size.width-olw)/2,
-                                     bounds.size.height-self.torchButton.bounds.size.height*1.3,
+                                     bounds.size.height-self.torchButton.bounds.size.height*1.3-kBottomSafeAreaHeight,
                                      olw,olh);
         self.openLight.numberOfLines = 0;
         [overlayView addSubview:self.openLight];
@@ -1048,67 +1071,68 @@ parentViewController:(UIViewController*)parentViewController
         UIColor* color = [UIColor colorWithRed:1.0 green:1.0 blue:1.0 alpha:1];
         CGContextSetStrokeColorWithColor(context, color.CGColor);
         CGContextSetLineWidth(context, RETICLE_WIDTH);
-        CGContextStrokeRect(context,CGRectMake(size*0.15,size*0.15-1,size*0.7,size*0.7));
+        float offset = (kTopSafeAreaHeight -20)/2 +(20-kTopSafeAreaHeight)/7;
+        CGContextStrokeRect(context,CGRectMake(size*0.15,size*0.15 +offset,size*0.7,size*0.7));
         //绘制四个角
         UIColor* greenColor = [UIColor colorWithRed:80/255 green:255/255 blue:162/255 alpha:1];
         float lineWidth = RETICLE_WIDTH *1.5;
         //绘制白色底色
         //左上↖️
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1+lineWidth/2
-                  endX:size*0.15+20 endY:size*0.15-1+lineWidth/2
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15+lineWidth/2 +offset
+                  endX:size*0.15+20 endY:size*0.15+lineWidth/2 +offset
                  color:color.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1
-                  endX:size*0.15+lineWidth/2 endY:size*0.15+19
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15 +offset
+                  endX:size*0.15+lineWidth/2 endY:size*0.15+20 +offset
                  color:color.CGColor width:lineWidth];//|
         //右上↗️
-        [self drawLine:context startX:size-size*0.15 startY:size*0.15-1+lineWidth/2
-                  endX:size-size*0.15-20 endY:size*0.15-1+lineWidth/2
+        [self drawLine:context startX:size-size*0.15 startY:size*0.15+lineWidth/2 +offset
+                  endX:size-size*0.15-20 endY:size*0.15+lineWidth/2 +offset
                  color:color.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15-1+lineWidth/2
-                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+19
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15+lineWidth/2 +offset
+                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+20 +offset
                  color:color.CGColor width:lineWidth];//|
         //左下↙️
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-1-lineWidth/2
-                  endX:size*0.15+20 endY:size-size*0.15-1-lineWidth/2
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2 +offset
+                  endX:size*0.15+20 endY:size-size*0.15-1-lineWidth/2 +offset
                  color:color.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2
-                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-21
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2 +offset
+                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-20 +offset
                  color:color.CGColor width:lineWidth];//|
         //右下↘️
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-1-lineWidth/2
-                  endX:size-size*0.15-20 endY:size-size*0.15-1-lineWidth/2
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2 +offset
+                  endX:size-size*0.15-20 endY:size-size*0.15-lineWidth/2 +offset
                  color:color.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2
-                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-21
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2+offset
+                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-20+offset
                  color:color.CGColor width:lineWidth];//|
         //绘制绿色边角
         //左上↖️
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1+lineWidth/2
-                  endX:size*0.15+20 endY:size*0.15-1+lineWidth/2
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15+lineWidth/2+offset
+                  endX:size*0.15+20 endY:size*0.15+lineWidth/2+offset
                  color:greenColor.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15-1
-                  endX:size*0.15+lineWidth/2 endY:size*0.15+19
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size*0.15+offset
+                  endX:size*0.15+lineWidth/2 endY:size*0.15+20+offset
                  color:greenColor.CGColor width:lineWidth];//|
         //右上↗️
-        [self drawLine:context startX:size-size*0.15 startY:size*0.15-1+lineWidth/2
-                  endX:size-size*0.15-20 endY:size*0.15-1+lineWidth/2
+        [self drawLine:context startX:size-size*0.15 startY:size*0.15-1+lineWidth/2+offset
+                  endX:size-size*0.15-20 endY:size*0.15+lineWidth/2+offset
                  color:greenColor.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15-1+lineWidth/2
-                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+19
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size*0.15+lineWidth/2+offset
+                  endX:size-size*0.15-lineWidth/2 endY:size*0.15+20+offset
                  color:greenColor.CGColor width:lineWidth];//|
         //左下↙️
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-1-lineWidth/2
-                  endX:size*0.15+20 endY:size-size*0.15-1-lineWidth/2
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2+offset
+                  endX:size*0.15+20 endY:size-size*0.15-lineWidth/2+offset
                  color:greenColor.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2
-                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-21
+        [self drawLine:context startX:size*0.15+lineWidth/2 startY:size-size*0.15-lineWidth/2+offset
+                  endX:size*0.15+lineWidth/2 endY:size-size*0.15-20+offset
                  color:greenColor.CGColor width:lineWidth];//|
         //右下↘️
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-1-lineWidth/2
-                  endX:size-size*0.15-20 endY:size-size*0.15-1-lineWidth/2
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2+offset
+                  endX:size-size*0.15-20 endY:size-size*0.15-lineWidth/2+offset
                  color:greenColor.CGColor width:lineWidth];//-
-        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2
-                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-21
+        [self drawLine:context startX:size-size*0.15-lineWidth/2 startY:size-size*0.15-lineWidth/2+offset
+                  endX:size-size*0.15-lineWidth/2 endY:size-size*0.15-20+offset
                  color:greenColor.CGColor width:lineWidth];//|
     }
 
@@ -1192,7 +1216,7 @@ parentViewController:(UIViewController*)parentViewController
     CGFloat rootViewHeight = CGRectGetHeight(bounds);
     CGFloat rootViewWidth  = CGRectGetWidth(bounds);
    // CGRect  rectArea       = CGRectMake(0, rootViewHeight - toolbarHeight, rootViewWidth, toolbarHeight);
-    CGRect  rectArea       = CGRectMake(0, 0, rootViewWidth, toolbarHeight+20);
+    CGRect  rectArea       = CGRectMake(0, kStatusBarHeight, rootViewWidth, toolbarHeight);
     [self.toolbar setFrame:rectArea];
 
     CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
