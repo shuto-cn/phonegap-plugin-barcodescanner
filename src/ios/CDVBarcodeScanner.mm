@@ -66,9 +66,10 @@
 @property (nonatomic)         BOOL                        isFlipped;
 @property (nonatomic)         BOOL                        isTransitionAnimated;
 @property (nonatomic)         BOOL                        isSuccessBeepEnabled;
+@property (nonatomic, retain) NSString* prompt;
 
 
-- (id)initWithPlugin:(CDVBarcodeScanner*)plugin callback:(NSString*)callback parentViewController:(UIViewController*)parentViewController alterateOverlayXib:(NSString *)alternateXib;
+- (id)initWithPlugin:(CDVBarcodeScanner*)plugin callback:(NSString*)callback parentViewController:(UIViewController*)parentViewController alterateOverlayXib:(NSString *)alternateXib prompt:(NSString *)prompt;
 - (void)scanBarcode;
 - (void)barcodeScanSucceeded:(NSString*)text format:(NSString*)format;
 - (void)barcodeScanFailed:(NSString*)message;
@@ -114,7 +115,6 @@
 - (IBAction)cancelButtonPressed:(id)sender;
 - (IBAction)flipCameraButtonPressed:(id)sender;
 - (IBAction)torchButtonPressed:(id)sender;
-
 @end
 
 //------------------------------------------------------------------------------
@@ -175,7 +175,15 @@
 
     // We allow the user to define an alternate xib file for loading the overlay.
     NSString *overlayXib = options[@"overlayXib"];
-
+    
+    NSString* prompt = options[@"showText"];
+    if(prompt == NULL){
+        prompt = options[@"prompt"];
+        if (prompt == NULL) {
+            prompt = @"扫描设备或者空间二维码";
+        }
+    }
+    
     capabilityError = [self isScanNotPossible];
     if (capabilityError) {
         [self returnError:capabilityError callback:callback];
@@ -195,6 +203,7 @@
                       callback:callback
           parentViewController:self.viewController
             alterateOverlayXib:overlayXib
+                 prompt:prompt
             ];
     // queue [processor scanBarcode] to run on the event loop
 
@@ -294,6 +303,7 @@
 @synthesize is2D                 = _is2D;
 @synthesize capturing            = _capturing;
 @synthesize results              = _results;
+@synthesize prompt              =  _prompt;
 
 SystemSoundID _soundFileObject;
 
@@ -301,7 +311,8 @@ SystemSoundID _soundFileObject;
 - (id)initWithPlugin:(CDVBarcodeScanner*)plugin
             callback:(NSString*)callback
 parentViewController:(UIViewController*)parentViewController
-  alterateOverlayXib:(NSString *)alternateXib {
+  alterateOverlayXib:(NSString *)alternateXib
+prompt:(NSString *)prompt {
     self = [super init];
     if (!self) return self;
 
@@ -309,6 +320,7 @@ parentViewController:(UIViewController*)parentViewController
     self.callback             = callback;
     self.parentViewController = parentViewController;
     self.alternateXib         = alternateXib;
+    self.prompt               = prompt;
 
     self.is1D      = YES;
     self.is2D      = YES;
@@ -1009,14 +1021,13 @@ parentViewController:(UIViewController*)parentViewController
     [self.reticleView.layer addSublayer:gl];
     //添加扫描提示
     UILabel *scanText = [[UILabel alloc] init];
-    float slw = 143;
     float slh = 18.5;
-    scanText.frame = CGRectMake((bounds.size.width-slw)/2,
+    scanText.frame = CGRectMake(0,
                                 (bounds.size.height-scanSize +kTopSafeAreaHeight)/2 + scanSize-20,
-                                slw,slh);
+                                bounds.size.width,slh);
     scanText.numberOfLines = 0;
     [overlayView addSubview:scanText];
-    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:@"扫描设备或者空间二维码"attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
+    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] initWithString:self.processor.prompt attributes: @{NSFontAttributeName: [UIFont fontWithName:@"PingFangSC-Regular" size: 13],NSForegroundColorAttributeName: [UIColor colorWithRed:255/255.0 green:255/255.0 blue:255/255.0 alpha:1.0]}];
     scanText.attributedText = string;
     scanText.textAlignment = NSTextAlignmentCenter;
     scanText .alpha = 1.0;
